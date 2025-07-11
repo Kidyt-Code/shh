@@ -1,17 +1,32 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
 local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
-
-local savedPosition = nil
-local ghostTorso = nil
-
--- UI Setup
 local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 screenGui.Name = "TeleportUI"
 
+-- Sound setup
+local function createSound(name, soundId)
+	local sound = Instance.new("Sound")
+	sound.Name = name
+	sound.SoundId = soundId
+	sound.Volume = 0.6
+	sound.Parent = screenGui
+	return sound
+end
+
+-- Existing sounds
+local clickSound = createSound("ClickSound", "rbxassetid://7817336081")
+local teleportSound = createSound("TeleportSound", "rbxassetid://864352897")
+local toggleSound = createSound("ToggleSound", "rbxassetid://6512218121") -- Shield break sound
+
+-- New sound for toggling shield OFF
+local toggleOffSound = createSound("ToggleOffSound", "rbxassetid://75053701115990")
+
+-- Message label
 local messageLabel = Instance.new("TextLabel", screenGui)
 messageLabel.Size = UDim2.new(1, 0, 0, 40)
 messageLabel.Position = UDim2.new(0, 0, 0, 0)
@@ -22,7 +37,8 @@ messageLabel.Font = Enum.Font.FredokaOne
 messageLabel.Text = ""
 messageLabel.ZIndex = 2
 
-local function createButton(name, pos, text)
+-- Create emoji button
+local function createEmojiButton(name, pos, emoji)
 	local btn = Instance.new("TextButton")
 	btn.Name = name
 	btn.Size = UDim2.new(0, 150, 0, 50)
@@ -31,7 +47,7 @@ local function createButton(name, pos, text)
 	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
 	btn.TextScaled = true
 	btn.Font = Enum.Font.FredokaOne
-	btn.Text = text
+	btn.Text = emoji
 
 	local corner = Instance.new("UICorner", btn)
 	corner.CornerRadius = UDim.new(0, 12)
@@ -41,17 +57,38 @@ local function createButton(name, pos, text)
 	stroke.Color = Color3.fromRGB(255, 255, 255)
 	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
-	btn.Parent = screenGui
 	return btn
 end
 
-local posBtn = createButton("PositionBtn", UDim2.new(0, 30, 1, -120), "Position")
-local tweenBtn = createButton("TweenBtn", UDim2.new(0, 200, 1, -120), "Tween")
+-- Draggable vertical frame
+local buttonFrame = Instance.new("Frame", screenGui)
+buttonFrame.Size = UDim2.new(0, 160, 0, 180)
+buttonFrame.Position = UDim2.new(0, 30, 1, -220)
+buttonFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+buttonFrame.BackgroundTransparency = 0.4
+buttonFrame.Active = true
+buttonFrame.Draggable = true
+buttonFrame.Selectable = true
 
--- Ghost torso
+Instance.new("UICorner", buttonFrame).CornerRadius = UDim.new(0, 12)
+Instance.new("UIStroke", buttonFrame).Thickness = 2
+
+-- Buttons
+local posBtn = createEmojiButton("PositionBtn", UDim2.new(0, 5, 0, 10), "📍 Save Position")
+posBtn.Parent = buttonFrame
+
+local tweenBtn = createEmojiButton("TweenBtn", UDim2.new(0, 5, 0, 65), "🌀 Tween")
+tweenBtn.Parent = buttonFrame
+
+local antiStunBtn = createEmojiButton("AntiStunBtn", UDim2.new(0, 5, 0, 120), "🛡️ Anti Stun: OFF")
+antiStunBtn.Parent = buttonFrame
+
+-- Saved position and ghost
+local savedPosition = nil
+local ghostTorso = nil
+
 local function createGhostTorso(position)
 	if ghostTorso then ghostTorso:Destroy() end
-
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
 	if not root then return end
 
@@ -66,43 +103,7 @@ local function createGhostTorso(position)
 	ghostTorso = torsoClone
 end
 
--- Position button
-posBtn.MouseButton1Click:Connect(function()
-	local char = player.Character or player.CharacterAdded:Wait()
-	local root = char:FindFirstChild("HumanoidRootPart")
-	if not root then return end
-
-	savedPosition = root.Position
-	createGhostTorso(savedPosition)
-
-	messageLabel.Text = "Saved Position"
-	task.delay(2, function()
-		messageLabel.Text = ""
-	end)
-end)
-
--- Tween button with upward offset built-in
-tweenBtn.MouseButton1Click:Connect(function()
-	if not savedPosition then return end
-	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
-	if not root then return end
-
-	local originalPosition = root.Position
-	root.CFrame = CFrame.new(originalPosition + Vector3.new(0, 500, 0))
-	task.wait(0.2)
-	root.CFrame = CFrame.new(originalPosition)
-	task.wait(0.2)
-
-	local upwardOffset = Vector3.new(0, 10, 0)
-	local targetPosition = savedPosition + upwardOffset
-
-	local tween = TweenService:Create(root, TweenInfo.new(5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-		CFrame = CFrame.new(targetPosition)
-	})
-	tween:Play()
-end)
-
--- ESP silhouette setup
+-- ESP
 local espAdornments = {}
 
 local function removeESP(character)
@@ -137,7 +138,6 @@ end
 
 local function setupCharacterESP(character)
 	addESP(character)
-
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		humanoid.Died:Connect(function()
@@ -146,28 +146,90 @@ local function setupCharacterESP(character)
 	end
 end
 
-local function onPlayerAdded(otherPlayer)
-	if otherPlayer == player then return end
-
-	if otherPlayer.Character then
-		setupCharacterESP(otherPlayer.Character)
+for _, p in ipairs(Players:GetPlayers()) do
+	if p ~= player then
+		if p.Character then
+			setupCharacterESP(p.Character)
+		end
+		p.CharacterAdded:Connect(setupCharacterESP)
 	end
-
-	otherPlayer.CharacterAdded:Connect(setupCharacterESP)
 end
 
-for _, otherPlayer in ipairs(Players:GetPlayers()) do
-	onPlayerAdded(otherPlayer)
-end
+Players.PlayerAdded:Connect(function(p)
+	if p ~= player then
+		p.CharacterAdded:Connect(setupCharacterESP)
+	end
+end)
 
-Players.PlayerAdded:Connect(onPlayerAdded)
-
--- Optional: ESP for yourself
 if player.Character then
 	setupCharacterESP(player.Character)
 end
+
 player.CharacterAdded:Connect(function(char)
 	character = char
 	humanoidRootPart = char:WaitForChild("HumanoidRootPart")
 	setupCharacterESP(char)
+end)
+
+-- Button functions
+posBtn.MouseButton1Click:Connect(function()
+	clickSound:Play()
+	local char = player.Character or player.CharacterAdded:Wait()
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+	savedPosition = root.Position
+	createGhostTorso(savedPosition)
+	messageLabel.Text = "Saved Position"
+	task.delay(2, function() messageLabel.Text = "" end)
+end)
+
+tweenBtn.MouseButton1Click:Connect(function()
+	if not savedPosition then return end
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+	teleportSound:Play()
+
+	local originalPosition = root.Position
+	root.CFrame = CFrame.new(originalPosition + Vector3.new(0, 500, 0))
+	task.wait(0.2)
+	root.CFrame = CFrame.new(originalPosition)
+	task.wait(0.2)
+
+	local targetPosition = savedPosition + Vector3.new(0, 10, 0)
+	local tween = TweenService:Create(root, TweenInfo.new(3.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		CFrame = CFrame.new(targetPosition)
+	})
+	tween:Play()
+end)
+
+-- Anti-Stun
+local antiStun = false
+local antiStunConnection
+
+local function setAntiStun(state)
+	antiStun = state
+	antiStunBtn.Text = "🛡️ Anti Stun: " .. (state and "ON" or "OFF")
+	if state then
+		toggleSound:Play()
+		antiStunConnection = RunService.Heartbeat:Connect(function()
+			local char = player.Character
+			if char then
+				for _, part in pairs(char:GetDescendants()) do
+					if part:IsA("BasePart") and part.Anchored then
+						part.Anchored = false
+					end
+				end
+			end
+		end)
+	else
+		toggleOffSound:Play()
+		if antiStunConnection then
+			antiStunConnection:Disconnect()
+			antiStunConnection = nil
+		end
+	end
+end
+
+antiStunBtn.MouseButton1Click:Connect(function()
+	setAntiStun(not antiStun)
 end)
