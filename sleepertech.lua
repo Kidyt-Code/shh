@@ -93,7 +93,7 @@ tweenBtn.MouseButton1Click:Connect(function()
 	root.CFrame = CFrame.new(originalPosition)
 	task.wait(0.2)
 
-	local upwardOffset = Vector3.new(0, 40, 0)
+	local upwardOffset = Vector3.new(0, 10, 0)
 	local targetPosition = savedPosition + upwardOffset
 
 	local tween = TweenService:Create(root, TweenInfo.new(5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
