@@ -72,8 +72,8 @@ tweenBtn.MouseButton1Click:Connect(function()
 	humanoidRootPart.CFrame = CFrame.new(originalPosition)
 	task.wait(0.2)
 
-	-- Tween to saved position (slow = 4s)
-	local tweenInfo = TweenInfo.new(4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	-- Tween to saved position (slow = 3s)
+	local tweenInfo = TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	local tween = TweenService:Create(humanoidRootPart, tweenInfo, {
 		CFrame = CFrame.new(savedPosition)
 	})
