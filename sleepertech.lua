@@ -1,26 +1,25 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
+local CollectionService = game:GetService("CollectionService")
+
 local player = Players.LocalPlayer
 
 local character = nil
 local humanoidRootPart = nil
 
--- Saved position & ghost highlight
 local savedPosition = nil
-local highlightModel = nil
+local highlightTorso = nil
 
--- Wait for character and root
 local function setupCharacter(char)
 	character = char
 	humanoidRootPart = char:WaitForChild("HumanoidRootPart", 10)
-
-	-- If a position was saved before, recreate the highlight ghost on respawn
+	
+	-- Recreate torso highlight on respawn if savedPosition exists
 	if savedPosition then
-		createHighlightModel(CFrame.new(savedPosition))
+		createHighlightTorso(savedPosition)
 	end
 end
 
--- UI Setup
 local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 screenGui.Name = "TeleportUI"
 
@@ -60,69 +59,33 @@ end
 local posBtn = createButton("PositionBtn", UDim2.new(0, 30, 1, -120), "Position")
 local tweenBtn = createButton("TweenBtn", UDim2.new(0, 200, 1, -120), "Tween")
 
-local function createHighlightModel(positionCFrame)
-	if highlightModel then
-		highlightModel:Destroy()
-		highlightModel = nil
+local function createHighlightTorso(position)
+	if highlightTorso then
+		highlightTorso:Destroy()
+		highlightTorso = nil
 	end
 
 	if not character then return end
+	local originalTorso = humanoidRootPart
+	if not originalTorso then return end
 
-	local success, clone = pcall(function()
-		return character:Clone()
-	end)
+	local cloneTorso = originalTorso:Clone()
+	cloneTorso.Anchored = true
+	cloneTorso.CanCollide = false
+	cloneTorso.Transparency = 0.5
+	cloneTorso.Material = Enum.Material.Neon
+	cloneTorso.Color = Color3.new(1,1,1)
+	cloneTorso.CFrame = CFrame.new(position)
+	cloneTorso.Parent = workspace
 
-	if not success or not clone then
-		warn("Failed to clone character")
-		return
-	end
-
-	highlightModel = clone
-	highlightModel.Name = "HighlightGhost"
-
-	for _, obj in pairs(highlightModel:GetDescendants()) do
-		if obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("Animator") then
-			obj:Destroy()
-		end
-	end
-
-	for _, part in ipairs(highlightModel:GetDescendants()) do
-		if part:IsA("BasePart") then
-			part.Anchored = true
-			part.CanCollide = false
-			part.Transparency = 0.5
-			part.Material = Enum.Material.Neon
-			part.Color = Color3.new(1, 1, 1)
-		elseif part:IsA("Accessory") then
-			local handle = part:FindFirstChild("Handle")
-			if handle and handle:IsA("BasePart") then
-				handle.Anchored = true
-				handle.CanCollide = false
-				handle.Transparency = 0.5
-				handle.Material = Enum.Material.Neon
-				handle.Color = Color3.new(1, 1, 1)
-			end
-		elseif part:IsA("Shirt") or part:IsA("Pants") then
-			part:Destroy()
-		elseif part:IsA("Humanoid") then
-			part.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
-		end
-	end
-
-	local rootPart = highlightModel:FindFirstChild("HumanoidRootPart")
-	if rootPart then
-		highlightModel.PrimaryPart = rootPart
-		highlightModel:SetPrimaryPartCFrame(positionCFrame)
-	end
-
-	highlightModel.Parent = workspace
+	highlightTorso = cloneTorso
 end
 
 posBtn.MouseButton1Click:Connect(function()
 	if not humanoidRootPart then return end
 
 	savedPosition = humanoidRootPart.Position
-	createHighlightModel(CFrame.new(savedPosition))
+	createHighlightTorso(savedPosition)
 
 	messageLabel.Text = "Saved Position"
 	task.delay(2, function()
@@ -148,34 +111,28 @@ tweenBtn.MouseButton1Click:Connect(function()
 	tween:Play()
 end)
 
--- ======= Player ESP =======
+-- ======= Player ESP using Highlight =======
 
-local ESP_COLOR = Color3.fromRGB(0, 85, 255)
-local ESP_TRANSPARENCY = 0.5
-
-local bodyParts = {
-	"Head",
-	"UpperTorso", "LowerTorso",
-	"Torso",
-	"LeftUpperArm", "LeftLowerArm", "LeftHand",
-	"RightUpperArm", "RightLowerArm", "RightHand",
-	"LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
-	"RightUpperLeg", "RightLowerLeg", "RightFoot",
-}
-
-local function applyESP(character)
-	for _, partName in ipairs(bodyParts) do
-		local part = character:FindFirstChild(partName)
-		if part and part:IsA("BasePart") then
-			part.Color = ESP_COLOR
-			part.Transparency = ESP_TRANSPARENCY
+local function applyHighlight(character)
+	-- Remove existing highlight to avoid duplicates
+	for _, h in ipairs(character:GetChildren()) do
+		if h:IsA("Highlight") then
+			h:Destroy()
 		end
 	end
+
+	local highlight = Instance.new("Highlight")
+	highlight.FillColor = Color3.fromRGB(0, 85, 255) -- Blue fill
+	highlight.FillTransparency = 0.5
+	highlight.OutlineColor = Color3.fromRGB(0, 85, 255)
+	highlight.OutlineTransparency = 0
+	highlight.Adornee = character
+	highlight.Parent = character
 end
 
 local function onCharacterAdded(character)
 	character:WaitForChild("HumanoidRootPart", 5)
-	applyESP(character)
+	applyHighlight(character)
 end
 
 local function onPlayerAdded(otherPlayer)
@@ -194,9 +151,14 @@ end
 
 Players.PlayerAdded:Connect(onPlayerAdded)
 
--- Handle local player character spawning
+-- Apply highlight to local player too (optional)
+if player.Character then
+	applyHighlight(player.Character)
+end
+player.CharacterAdded:Connect(applyHighlight)
+
+-- Setup local player character tracking
 if player.Character then
 	setupCharacter(player.Character)
 end
-
 player.CharacterAdded:Connect(setupCharacter)
