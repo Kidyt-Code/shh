@@ -1,14 +1,20 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+-- Helper functions to get character and root
+local function getCharacter()
+	return player.Character or player.CharacterAdded:Wait()
+end
+
+local function getRoot(char)
+	return char:WaitForChild("HumanoidRootPart", 10)
+end
 
 -- UI Setup
 local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 screenGui.Name = "TeleportUI"
 
--- Message Label
 local messageLabel = Instance.new("TextLabel", screenGui)
 messageLabel.Size = UDim2.new(1, 0, 0, 40)
 messageLabel.Position = UDim2.new(0, 0, 0, 0)
@@ -19,7 +25,6 @@ messageLabel.Font = Enum.Font.FredokaOne
 messageLabel.Text = ""
 messageLabel.ZIndex = 2
 
--- UI Template Function
 local function createButton(name, pos, text)
 	local btn = Instance.new("TextButton")
 	btn.Name = name
@@ -43,16 +48,82 @@ local function createButton(name, pos, text)
 	return btn
 end
 
--- Buttons
 local posBtn = createButton("PositionBtn", UDim2.new(0, 30, 1, -120), "Position")
 local tweenBtn = createButton("TweenBtn", UDim2.new(0, 200, 1, -120), "Tween")
 
--- Position Saving
 local savedPosition = nil
+local highlightModel = nil
+
+local function createHighlightModel(positionCFrame)
+	if highlightModel then
+		highlightModel:Destroy()
+		highlightModel = nil
+	end
+
+	local currentCharacter = getCharacter()
+	if not currentCharacter then return end
+
+	local success, clone = pcall(function()
+		return currentCharacter:Clone()
+	end)
+
+	if not success or not clone then
+		warn("Failed to clone character")
+		return
+	end
+
+	highlightModel = clone
+	highlightModel.Name = "HighlightGhost"
+
+	-- Remove scripts and animators
+	for _, obj in pairs(highlightModel:GetDescendants()) do
+		if obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("Animator") then
+			obj:Destroy()
+		end
+	end
+
+	-- Style parts
+	for _, part in ipairs(highlightModel:GetDescendants()) do
+		if part:IsA("BasePart") then
+			part.Anchored = true
+			part.CanCollide = false
+			part.Transparency = 0.5
+			part.Material = Enum.Material.Neon
+			part.Color = Color3.new(1, 1, 1)
+		elseif part:IsA("Accessory") then
+			local handle = part:FindFirstChild("Handle")
+			if handle and handle:IsA("BasePart") then
+				handle.Anchored = true
+				handle.CanCollide = false
+				handle.Transparency = 0.5
+				handle.Material = Enum.Material.Neon
+				handle.Color = Color3.new(1, 1, 1)
+			end
+		elseif part:IsA("Shirt") or part:IsA("Pants") then
+			part:Destroy()
+		elseif part:IsA("Humanoid") then
+			part.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
+		end
+	end
+
+	-- Position the highlight
+	local rootPart = highlightModel:FindFirstChild("HumanoidRootPart")
+	if rootPart then
+		highlightModel.PrimaryPart = rootPart
+		highlightModel:SetPrimaryPartCFrame(positionCFrame)
+	end
+
+	highlightModel.Parent = workspace
+end
 
 posBtn.MouseButton1Click:Connect(function()
-	if character.Parent == nil then return end
-	savedPosition = humanoidRootPart.Position
+	local currentCharacter = getCharacter()
+	local root = getRoot(currentCharacter)
+	if not root then return end
+
+	savedPosition = root.Position
+	createHighlightModel(CFrame.new(savedPosition))
+
 	messageLabel.Text = "Saved Position"
 	task.delay(2, function()
 		messageLabel.Text = ""
@@ -62,20 +133,70 @@ end)
 tweenBtn.MouseButton1Click:Connect(function()
 	if not savedPosition then return end
 
-	local originalPosition = humanoidRootPart.Position
+	local character = getCharacter()
+	local root = getRoot(character)
+	if not root then return end
 
-	-- Teleport Up Higher (+500)
-	humanoidRootPart.CFrame = CFrame.new(originalPosition + Vector3.new(0, 500, 0))
+	local originalPosition = root.Position
+
+	-- Teleport up 500 studs
+	root.CFrame = CFrame.new(originalPosition + Vector3.new(0, 500, 0))
 	task.wait(0.2)
 
-	-- Back to original
-	humanoidRootPart.CFrame = CFrame.new(originalPosition)
+	-- Back to original position
+	root.CFrame = CFrame.new(originalPosition)
 	task.wait(0.2)
 
-	-- Tween to saved position (slow = 3s)
+	-- Tween to saved position over 3 seconds
 	local tweenInfo = TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	local tween = TweenService:Create(humanoidRootPart, tweenInfo, {
+	local tween = TweenService:Create(root, tweenInfo, {
 		CFrame = CFrame.new(savedPosition)
 	})
 	tween:Play()
 end)
+
+-- ======= Player ESP =======
+
+local ESP_COLOR = Color3.fromRGB(0, 85, 255)
+local ESP_TRANSPARENCY = 0.5
+
+local bodyParts = {
+	"Head",
+	"UpperTorso", "LowerTorso", -- R15 torso parts
+	"Torso", -- R6 torso
+	"LeftUpperArm", "LeftLowerArm", "LeftHand",
+	"RightUpperArm", "RightLowerArm", "RightHand",
+	"LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
+	"RightUpperLeg", "RightLowerLeg", "RightFoot",
+}
+
+local function applyESP(character)
+	for _, partName in ipairs(bodyParts) do
+		local part = character:FindFirstChild(partName)
+		if part and part:IsA("BasePart") then
+			part.Color = ESP_COLOR
+			part.Transparency = ESP_TRANSPARENCY
+		end
+	end
+end
+
+local function onCharacterAdded(character)
+	character:WaitForChild("HumanoidRootPart", 5)
+	applyESP(character)
+end
+
+local function onPlayerAdded(otherPlayer)
+	if otherPlayer == player then return end
+
+	if otherPlayer.Character then
+		onCharacterAdded(otherPlayer.Character)
+	end
+
+	otherPlayer.CharacterAdded:Connect(onCharacterAdded)
+end
+
+for _, otherPlayer in ipairs(Players:GetPlayers()) do
+	onPlayerAdded(otherPlayer)
+end
+
+Players.PlayerAdded:Connect(onPlayerAdded)
