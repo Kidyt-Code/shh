@@ -196,7 +196,7 @@ tweenBtn.MouseButton1Click:Connect(function()
 	task.wait(0.2)
 
 	local targetPosition = savedPosition + Vector3.new(0, 10, 0)
-	local tween = TweenService:Create(root, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+	local tween = TweenService:Create(root, TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		CFrame = CFrame.new(targetPosition)
 	})
 	tween:Play()
