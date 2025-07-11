@@ -31,19 +31,17 @@ local function createButton(name, pos, text)
 	btn.Font = Enum.Font.FredokaOne
 	btn.Text = text
 
-	-- Styling
 	local corner = Instance.new("UICorner", btn)
 	corner.CornerRadius = UDim.new(0, 12)
 
 	local stroke = Instance.new("UIStroke", btn)
 	stroke.Thickness = 3
 	stroke.Color = Color3.fromRGB(255, 255, 255)
-	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border -- 👈 Border mode here
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 
 	btn.Parent = screenGui
 	return btn
 end
-
 
 -- Buttons
 local posBtn = createButton("PositionBtn", UDim2.new(0, 30, 1, -120), "Position")
@@ -64,17 +62,18 @@ end)
 tweenBtn.MouseButton1Click:Connect(function()
 	if not savedPosition then return end
 
-	-- Teleport Up
 	local originalPosition = humanoidRootPart.Position
-	humanoidRootPart.CFrame = CFrame.new(originalPosition + Vector3.new(0, 100, 0))
+
+	-- Teleport Up Higher (+500)
+	humanoidRootPart.CFrame = CFrame.new(originalPosition + Vector3.new(0, 500, 0))
 	task.wait(0.2)
 
-	-- Back to original ground position
+	-- Back to original
 	humanoidRootPart.CFrame = CFrame.new(originalPosition)
 	task.wait(0.2)
 
-	-- Tween to saved position
-	local tweenInfo = TweenInfo.new(1.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	-- Tween to saved position (slow = 4s)
+	local tweenInfo = TweenInfo.new(4, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 	local tween = TweenService:Create(humanoidRootPart, tweenInfo, {
 		CFrame = CFrame.new(savedPosition)
 	})
