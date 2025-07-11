@@ -81,7 +81,7 @@ posBtn.MouseButton1Click:Connect(function()
 	end)
 end)
 
--- Tween button
+-- Tween button with upward fly after
 tweenBtn.MouseButton1Click:Connect(function()
 	if not savedPosition then return end
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
@@ -93,10 +93,20 @@ tweenBtn.MouseButton1Click:Connect(function()
 	root.CFrame = CFrame.new(originalPosition)
 	task.wait(0.2)
 
-	local tween = TweenService:Create(root, TweenInfo.new(5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+	local tweenInfo = TweenInfo.new(3.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+	local toPositionTween = TweenService:Create(root, tweenInfo, {
 		CFrame = CFrame.new(savedPosition)
 	})
-	tween:Play()
+
+	toPositionTween:Play()
+
+	-- After tween finishes, fly up 40 studs
+	toPositionTween.Completed:Connect(function()
+		local upTween = TweenService:Create(root, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+			CFrame = root.CFrame + Vector3.new(0, 40, 0)
+		})
+		upTween:Play()
+	end)
 end)
 
 -- ESP silhouette setup
