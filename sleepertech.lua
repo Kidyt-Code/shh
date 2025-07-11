@@ -196,7 +196,7 @@ tweenBtn.MouseButton1Click:Connect(function()
 	task.wait(0.2)
 
 	local targetPosition = savedPosition + Vector3.new(0, 10, 0)
-	local tween = TweenService:Create(root, TweenInfo.new(3.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+	local tween = TweenService:Create(root, TweenInfo.new(1, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		CFrame = CFrame.new(targetPosition)
 	})
 	tween:Play()
@@ -205,6 +205,14 @@ end)
 -- Anti-Stun
 local antiStun = false
 local antiStunConnection
+
+local function removeBodyMoversFromPart(part)
+	for _, child in pairs(part:GetChildren()) do
+		if child:IsA("BodyVelocity") or child:IsA("BodyPosition") or child:IsA("BodyGyro") or child:IsA("BodyForce") then
+			child:Destroy()
+		end
+	end
+end
 
 local function setAntiStun(state)
 	antiStun = state
@@ -215,8 +223,12 @@ local function setAntiStun(state)
 			local char = player.Character
 			if char then
 				for _, part in pairs(char:GetDescendants()) do
-					if part:IsA("BasePart") and part.Anchored then
-						part.Anchored = false
+					if part:IsA("BasePart") then
+						if part.Anchored then
+							part.Anchored = false
+						end
+						-- Remove stun-related body movers
+						removeBodyMoversFromPart(part)
 					end
 				end
 			end
