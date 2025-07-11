@@ -1,6 +1,5 @@
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
-local CollectionService = game:GetService("CollectionService")
 
 local player = Players.LocalPlayer
 
@@ -10,11 +9,12 @@ local humanoidRootPart = nil
 local savedPosition = nil
 local highlightTorso = nil
 
+local espOriginalTransparency = {}
+
 local function setupCharacter(char)
 	character = char
 	humanoidRootPart = char:WaitForChild("HumanoidRootPart", 10)
 	
-	-- Recreate torso highlight on respawn if savedPosition exists
 	if savedPosition then
 		createHighlightTorso(savedPosition)
 	end
@@ -111,28 +111,97 @@ tweenBtn.MouseButton1Click:Connect(function()
 	tween:Play()
 end)
 
--- ======= Player ESP using Highlight =======
+-- ======= Player ESP using Highlight + Billboard + forced local transparency =======
+
+local function addBillboardMarker(character)
+	-- Remove existing marker to avoid duplicates
+	local existing = character:FindFirstChild("ESPBillboard")
+	if existing then existing:Destroy() end
+
+	local head = character:FindFirstChild("Head")
+	if not head then return end
+
+	local billboard = Instance.new("BillboardGui")
+	billboard.Name = "ESPBillboard"
+	billboard.Adornee = head
+	billboard.Size = UDim2.new(0, 50, 0, 50)
+	billboard.StudsOffset = Vector3.new(0, 2, 0)
+	billboard.AlwaysOnTop = true
+	billboard.Parent = character
+
+	local frame = Instance.new("Frame", billboard)
+	frame.Size = UDim2.new(1, 0, 1, 0)
+	frame.BackgroundColor3 = Color3.fromRGB(0, 85, 255)
+	frame.BackgroundTransparency = 0.5
+	frame.BorderSizePixel = 0
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.Position = UDim2.new(0.5, 0, 0.5, 0)
+	frame.ClipsDescendants = true
+end
+
+local function setPartsTransparency(character, transparency)
+	for _, part in ipairs(character:GetChildren()) do
+		if part:IsA("BasePart") then
+			if transparency == nil then
+				-- Restore original transparency
+				if espOriginalTransparency[part] ~= nil then
+					part.LocalTransparencyModifier = espOriginalTransparency[part]
+					espOriginalTransparency[part] = nil
+				end
+			else
+				-- Save original and set transparency locally
+				if espOriginalTransparency[part] == nil then
+					espOriginalTransparency[part] = part.LocalTransparencyModifier
+				end
+				part.LocalTransparencyModifier = transparency
+			end
+		end
+	end
+end
 
 local function applyHighlight(character)
-	-- Remove existing highlight to avoid duplicates
-	for _, h in ipairs(character:GetChildren()) do
-		if h:IsA("Highlight") then
-			h:Destroy()
+	-- Remove old highlights and markers
+	for _, child in ipairs(character:GetChildren()) do
+		if child:IsA("Highlight") or child.Name == "ESPBillboard" then
+			child:Destroy()
 		end
 	end
 
 	local highlight = Instance.new("Highlight")
-	highlight.FillColor = Color3.fromRGB(0, 85, 255) -- Blue fill
+	highlight.FillColor = Color3.fromRGB(0, 85, 255)
 	highlight.FillTransparency = 0.5
 	highlight.OutlineColor = Color3.fromRGB(0, 85, 255)
 	highlight.OutlineTransparency = 0
 	highlight.Adornee = character
 	highlight.Parent = character
+
+	addBillboardMarker(character)
+
+	-- Force parts semi-visible locally so highlight shows through invisibility
+	setPartsTransparency(character, 0.5)
+end
+
+local function clearHighlight(character)
+	-- Remove highlight and marker
+	for _, child in ipairs(character:GetChildren()) do
+		if child:IsA("Highlight") or child.Name == "ESPBillboard" then
+			child:Destroy()
+		end
+	end
+	-- Restore original transparencies
+	setPartsTransparency(character, nil)
 end
 
 local function onCharacterAdded(character)
 	character:WaitForChild("HumanoidRootPart", 5)
 	applyHighlight(character)
+
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.Died:Connect(function()
+			clearHighlight(character)
+		end)
+	end
 end
 
 local function onPlayerAdded(otherPlayer)
@@ -151,11 +220,11 @@ end
 
 Players.PlayerAdded:Connect(onPlayerAdded)
 
--- Apply highlight to local player too (optional)
+-- Apply to local player too
 if player.Character then
-	applyHighlight(player.Character)
+	onCharacterAdded(player.Character)
 end
-player.CharacterAdded:Connect(applyHighlight)
+player.CharacterAdded:Connect(onCharacterAdded)
 
 -- Setup local player character tracking
 if player.Character then
