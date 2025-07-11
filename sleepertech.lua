@@ -2,13 +2,22 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 local player = Players.LocalPlayer
 
--- Helper functions to get character and root
-local function getCharacter()
-	return player.Character or player.CharacterAdded:Wait()
-end
+local character = nil
+local humanoidRootPart = nil
 
-local function getRoot(char)
-	return char:WaitForChild("HumanoidRootPart", 10)
+-- Saved position & ghost highlight
+local savedPosition = nil
+local highlightModel = nil
+
+-- Wait for character and root
+local function setupCharacter(char)
+	character = char
+	humanoidRootPart = char:WaitForChild("HumanoidRootPart", 10)
+
+	-- If a position was saved before, recreate the highlight ghost on respawn
+	if savedPosition then
+		createHighlightModel(CFrame.new(savedPosition))
+	end
 end
 
 -- UI Setup
@@ -51,20 +60,16 @@ end
 local posBtn = createButton("PositionBtn", UDim2.new(0, 30, 1, -120), "Position")
 local tweenBtn = createButton("TweenBtn", UDim2.new(0, 200, 1, -120), "Tween")
 
-local savedPosition = nil
-local highlightModel = nil
-
 local function createHighlightModel(positionCFrame)
 	if highlightModel then
 		highlightModel:Destroy()
 		highlightModel = nil
 	end
 
-	local currentCharacter = getCharacter()
-	if not currentCharacter then return end
+	if not character then return end
 
 	local success, clone = pcall(function()
-		return currentCharacter:Clone()
+		return character:Clone()
 	end)
 
 	if not success or not clone then
@@ -75,14 +80,12 @@ local function createHighlightModel(positionCFrame)
 	highlightModel = clone
 	highlightModel.Name = "HighlightGhost"
 
-	-- Remove scripts and animators
 	for _, obj in pairs(highlightModel:GetDescendants()) do
 		if obj:IsA("Script") or obj:IsA("LocalScript") or obj:IsA("Animator") then
 			obj:Destroy()
 		end
 	end
 
-	-- Style parts
 	for _, part in ipairs(highlightModel:GetDescendants()) do
 		if part:IsA("BasePart") then
 			part.Anchored = true
@@ -106,7 +109,6 @@ local function createHighlightModel(positionCFrame)
 		end
 	end
 
-	-- Position the highlight
 	local rootPart = highlightModel:FindFirstChild("HumanoidRootPart")
 	if rootPart then
 		highlightModel.PrimaryPart = rootPart
@@ -117,11 +119,9 @@ local function createHighlightModel(positionCFrame)
 end
 
 posBtn.MouseButton1Click:Connect(function()
-	local currentCharacter = getCharacter()
-	local root = getRoot(currentCharacter)
-	if not root then return end
+	if not humanoidRootPart then return end
 
-	savedPosition = root.Position
+	savedPosition = humanoidRootPart.Position
 	createHighlightModel(CFrame.new(savedPosition))
 
 	messageLabel.Text = "Saved Position"
@@ -131,25 +131,18 @@ posBtn.MouseButton1Click:Connect(function()
 end)
 
 tweenBtn.MouseButton1Click:Connect(function()
-	if not savedPosition then return end
+	if not savedPosition or not humanoidRootPart then return end
 
-	local character = getCharacter()
-	local root = getRoot(character)
-	if not root then return end
+	local originalPosition = humanoidRootPart.Position
 
-	local originalPosition = root.Position
-
-	-- Teleport up 500 studs
-	root.CFrame = CFrame.new(originalPosition + Vector3.new(0, 500, 0))
+	humanoidRootPart.CFrame = CFrame.new(originalPosition + Vector3.new(0, 500, 0))
 	task.wait(0.2)
 
-	-- Back to original position
-	root.CFrame = CFrame.new(originalPosition)
+	humanoidRootPart.CFrame = CFrame.new(originalPosition)
 	task.wait(0.2)
 
-	-- Tween to saved position over 3 seconds
 	local tweenInfo = TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	local tween = TweenService:Create(root, tweenInfo, {
+	local tween = TweenService:Create(humanoidRootPart, tweenInfo, {
 		CFrame = CFrame.new(savedPosition)
 	})
 	tween:Play()
@@ -162,8 +155,8 @@ local ESP_TRANSPARENCY = 0.5
 
 local bodyParts = {
 	"Head",
-	"UpperTorso", "LowerTorso", -- R15 torso parts
-	"Torso", -- R6 torso
+	"UpperTorso", "LowerTorso",
+	"Torso",
 	"LeftUpperArm", "LeftLowerArm", "LeftHand",
 	"RightUpperArm", "RightLowerArm", "RightHand",
 	"LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
@@ -200,3 +193,10 @@ for _, otherPlayer in ipairs(Players:GetPlayers()) do
 end
 
 Players.PlayerAdded:Connect(onPlayerAdded)
+
+-- Handle local player character spawning
+if player.Character then
+	setupCharacter(player.Character)
+end
+
+player.CharacterAdded:Connect(setupCharacter)
