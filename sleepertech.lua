@@ -191,7 +191,7 @@ posBtn.MouseButton1Click:Connect(function()
 	task.delay(2, function() messageLabel.Text = "" end)
 end)
 
--- Tween + Orbit
+-- + Orbit
 tweenBtn.MouseButton1Click:Connect(function()
 	if not savedPosition then return end
 	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
@@ -210,7 +210,6 @@ tweenBtn.MouseButton1Click:Connect(function()
 	})
 	tween:Play()
 	tween.Completed:Connect(function()
-		task.wait(0.1)
 		orbitAround(savedPosition)
 	end)
 end)
