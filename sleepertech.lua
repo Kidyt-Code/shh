@@ -2,24 +2,13 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
 local player = Players.LocalPlayer
-
-local character = nil
-local humanoidRootPart = nil
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
 local savedPosition = nil
-local highlightTorso = nil
+local ghostTorso = nil
 
-local espOriginalTransparency = {}
-
-local function setupCharacter(char)
-	character = char
-	humanoidRootPart = char:WaitForChild("HumanoidRootPart", 10)
-	
-	if savedPosition then
-		createHighlightTorso(savedPosition)
-	end
-end
-
+-- UI Setup
 local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 screenGui.Name = "TeleportUI"
 
@@ -59,33 +48,32 @@ end
 local posBtn = createButton("PositionBtn", UDim2.new(0, 30, 1, -120), "Position")
 local tweenBtn = createButton("TweenBtn", UDim2.new(0, 200, 1, -120), "Tween")
 
-local function createHighlightTorso(position)
-	if highlightTorso then
-		highlightTorso:Destroy()
-		highlightTorso = nil
-	end
+-- Ghost torso
+local function createGhostTorso(position)
+	if ghostTorso then ghostTorso:Destroy() end
 
-	if not character then return end
-	local originalTorso = humanoidRootPart
-	if not originalTorso then return end
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
 
-	local cloneTorso = originalTorso:Clone()
-	cloneTorso.Anchored = true
-	cloneTorso.CanCollide = false
-	cloneTorso.Transparency = 0.5
-	cloneTorso.Material = Enum.Material.Neon
-	cloneTorso.Color = Color3.new(1,1,1)
-	cloneTorso.CFrame = CFrame.new(position)
-	cloneTorso.Parent = workspace
-
-	highlightTorso = cloneTorso
+	local torsoClone = root:Clone()
+	torsoClone.Anchored = true
+	torsoClone.CanCollide = false
+	torsoClone.Transparency = 0.5
+	torsoClone.Material = Enum.Material.Neon
+	torsoClone.Color = Color3.new(1, 1, 1)
+	torsoClone.CFrame = CFrame.new(position)
+	torsoClone.Parent = workspace
+	ghostTorso = torsoClone
 end
 
+-- Position button
 posBtn.MouseButton1Click:Connect(function()
-	if not humanoidRootPart then return end
+	local char = player.Character or player.CharacterAdded:Wait()
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if not root then return end
 
-	savedPosition = humanoidRootPart.Position
-	createHighlightTorso(savedPosition)
+	savedPosition = root.Position
+	createGhostTorso(savedPosition)
 
 	messageLabel.Text = "Saved Position"
 	task.delay(2, function()
@@ -93,113 +81,64 @@ posBtn.MouseButton1Click:Connect(function()
 	end)
 end)
 
+-- Tween button
 tweenBtn.MouseButton1Click:Connect(function()
-	if not savedPosition or not humanoidRootPart then return end
+	if not savedPosition then return end
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
 
-	local originalPosition = humanoidRootPart.Position
-
-	humanoidRootPart.CFrame = CFrame.new(originalPosition + Vector3.new(0, 500, 0))
+	local originalPosition = root.Position
+	root.CFrame = CFrame.new(originalPosition + Vector3.new(0, 500, 0))
+	task.wait(0.2)
+	root.CFrame = CFrame.new(originalPosition)
 	task.wait(0.2)
 
-	humanoidRootPart.CFrame = CFrame.new(originalPosition)
-	task.wait(0.2)
-
-	local tweenInfo = TweenInfo.new(3, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
-	local tween = TweenService:Create(humanoidRootPart, tweenInfo, {
+	local tween = TweenService:Create(root, TweenInfo.new(5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
 		CFrame = CFrame.new(savedPosition)
 	})
 	tween:Play()
 end)
 
--- ======= Player ESP using Highlight + Billboard + forced local transparency =======
+-- ESP silhouette setup
+local espAdornments = {}
 
-local function addBillboardMarker(character)
-	-- Remove existing marker to avoid duplicates
-	local existing = character:FindFirstChild("ESPBillboard")
-	if existing then existing:Destroy() end
-
-	local head = character:FindFirstChild("Head")
-	if not head then return end
-
-	local billboard = Instance.new("BillboardGui")
-	billboard.Name = "ESPBillboard"
-	billboard.Adornee = head
-	billboard.Size = UDim2.new(0, 50, 0, 50)
-	billboard.StudsOffset = Vector3.new(0, 2, 0)
-	billboard.AlwaysOnTop = true
-	billboard.Parent = character
-
-	local frame = Instance.new("Frame", billboard)
-	frame.Size = UDim2.new(1, 0, 1, 0)
-	frame.BackgroundColor3 = Color3.fromRGB(0, 85, 255)
-	frame.BackgroundTransparency = 0.5
-	frame.BorderSizePixel = 0
-	frame.AnchorPoint = Vector2.new(0.5, 0.5)
-	frame.Position = UDim2.new(0.5, 0, 0.5, 0)
-	frame.ClipsDescendants = true
-end
-
-local function setPartsTransparency(character, transparency)
-	for _, part in ipairs(character:GetChildren()) do
-		if part:IsA("BasePart") then
-			if transparency == nil then
-				-- Restore original transparency
-				if espOriginalTransparency[part] ~= nil then
-					part.LocalTransparencyModifier = espOriginalTransparency[part]
-					espOriginalTransparency[part] = nil
-				end
-			else
-				-- Save original and set transparency locally
-				if espOriginalTransparency[part] == nil then
-					espOriginalTransparency[part] = part.LocalTransparencyModifier
-				end
-				part.LocalTransparencyModifier = transparency
+local function removeESP(character)
+	if espAdornments[character] then
+		for _, adorn in ipairs(espAdornments[character]) do
+			if adorn and adorn.Parent then
+				adorn:Destroy()
 			end
 		end
+		espAdornments[character] = nil
 	end
 end
 
-local function applyHighlight(character)
-	-- Remove old highlights and markers
-	for _, child in ipairs(character:GetChildren()) do
-		if child:IsA("Highlight") or child.Name == "ESPBillboard" then
-			child:Destroy()
+local function addESP(character)
+	removeESP(character)
+	espAdornments[character] = {}
+
+	for _, part in ipairs(character:GetDescendants()) do
+		if part:IsA("BasePart") then
+			local adorn = Instance.new("BoxHandleAdornment")
+			adorn.Adornee = part
+			adorn.Size = part.Size
+			adorn.Transparency = 0.5
+			adorn.ZIndex = 10
+			adorn.AlwaysOnTop = true
+			adorn.Color3 = Color3.fromRGB(0, 170, 255)
+			adorn.Parent = part
+			table.insert(espAdornments[character], adorn)
 		end
 	end
-
-	local highlight = Instance.new("Highlight")
-	highlight.FillColor = Color3.fromRGB(0, 85, 255)
-	highlight.FillTransparency = 0.5
-	highlight.OutlineColor = Color3.fromRGB(0, 85, 255)
-	highlight.OutlineTransparency = 0
-	highlight.Adornee = character
-	highlight.Parent = character
-
-	addBillboardMarker(character)
-
-	-- Force parts semi-visible locally so highlight shows through invisibility
-	setPartsTransparency(character, 0.5)
 end
 
-local function clearHighlight(character)
-	-- Remove highlight and marker
-	for _, child in ipairs(character:GetChildren()) do
-		if child:IsA("Highlight") or child.Name == "ESPBillboard" then
-			child:Destroy()
-		end
-	end
-	-- Restore original transparencies
-	setPartsTransparency(character, nil)
-end
-
-local function onCharacterAdded(character)
-	character:WaitForChild("HumanoidRootPart", 5)
-	applyHighlight(character)
+local function setupCharacterESP(character)
+	addESP(character)
 
 	local humanoid = character:FindFirstChildOfClass("Humanoid")
 	if humanoid then
 		humanoid.Died:Connect(function()
-			clearHighlight(character)
+			removeESP(character)
 		end)
 	end
 end
@@ -208,10 +147,10 @@ local function onPlayerAdded(otherPlayer)
 	if otherPlayer == player then return end
 
 	if otherPlayer.Character then
-		onCharacterAdded(otherPlayer.Character)
+		setupCharacterESP(otherPlayer.Character)
 	end
 
-	otherPlayer.CharacterAdded:Connect(onCharacterAdded)
+	otherPlayer.CharacterAdded:Connect(setupCharacterESP)
 end
 
 for _, otherPlayer in ipairs(Players:GetPlayers()) do
@@ -220,14 +159,12 @@ end
 
 Players.PlayerAdded:Connect(onPlayerAdded)
 
--- Apply to local player too
+-- Optional: ESP for yourself
 if player.Character then
-	onCharacterAdded(player.Character)
+	setupCharacterESP(player.Character)
 end
-player.CharacterAdded:Connect(onCharacterAdded)
-
--- Setup local player character tracking
-if player.Character then
-	setupCharacter(player.Character)
-end
-player.CharacterAdded:Connect(setupCharacter)
+player.CharacterAdded:Connect(function(char)
+	character = char
+	humanoidRootPart = char:WaitForChild("HumanoidRootPart")
+	setupCharacterESP(char)
+end)
