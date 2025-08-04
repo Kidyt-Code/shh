@@ -1,271 +1,256 @@
-local a,b,c=game:GetService("Players"),game:GetService("TweenService"),game:GetService("RunService")
-local d=a.LocalPlayer
-local e=d.Character or d.CharacterAdded:Wait()
-local f=e:WaitForChild("HumanoidRootPart")
-local g,h= "KIDYTBETTER",nil
-local i=7200
-local function j(k)
-	local l=k:upper():gsub("%s+","")
-	if l~=g then return false,"Invalid key." end
-	if h and os.time()-h>=i then return false,"Key expired." end
-	if not h then h=os.time() end
-	return true,"Key valid. Access granted!"
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
+
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
+
+-- GUI
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+screenGui.Name = "TeleportUI"
+
+-- Sounds
+local function createSound(name, soundId)
+	local sound = Instance.new("Sound")
+	sound.Name = name
+	sound.SoundId = soundId
+	sound.Volume = 0.6
+	sound.Parent = screenGui
+	return sound
 end
-local m=Instance.new("ScreenGui",d:WaitForChild("PlayerGui"))m.Name="KeyInputGui"
-local n=Instance.new("Frame",m)
-n.Size=UDim2.new(0,400,0,200)
-n.Position=UDim2.new(0.5,-200,0.5,-100)
-n.BackgroundColor3=Color3.fromRGB(30,30,30)
-n.BorderSizePixel=0;n.Active=true;n.Draggable=true
-Instance.new("UICorner",n).CornerRadius=UDim.new(0,15)
-local o=Instance.new("TextLabel",n)
-o.Size=UDim2.new(1,0,0,50)
-o.Position=UDim2.new(0,0,0,0)
-o.BackgroundTransparency=1
-o.Font=Enum.Font.FredokaOne
-o.TextSize=28
-o.TextColor3=Color3.fromRGB(0,255,0)
-o.Text="Enter your key"
-o.TextScaled=true
-local p=Instance.new("TextBox",n)
-p.Size=UDim2.new(0.8,0,0,40)
-p.Position=UDim2.new(0.1,0,0,90)
-p.ClearTextOnFocus=false
-p.Font=Enum.Font.FredokaOne
-p.TextSize=24
-p.PlaceholderText="Paste key here..."
-p.TextColor3=Color3.fromRGB(255,255,255)
-p.BackgroundColor3=Color3.fromRGB(50,50,50)
-Instance.new("UICorner",p).CornerRadius=UDim.new(0,8)
-local q=Instance.new("TextButton",n)
-q.Size=UDim2.new(0.4,0,0,40)
-q.Position=UDim2.new(0.3,0,0,140)
-q.Text="Submit"
-q.Font=Enum.Font.FredokaOne
-q.TextSize=24
-q.TextColor3=Color3.fromRGB(255,255,255)
-q.BackgroundColor3=Color3.fromRGB(0,150,0)
-Instance.new("UICorner",q).CornerRadius=UDim.new(0,8)
-local r=Instance.new("TextLabel",n)
-r.Size=UDim2.new(1,-20,0,30)
-r.Position=UDim2.new(0,10,0,185)
-r.BackgroundTransparency=1
-r.Font=Enum.Font.FredokaOne
-r.TextSize=18
-r.TextColor3=Color3.fromRGB(255,0,0)
-r.Text=""
-local s=Instance.new("ScreenGui",d:WaitForChild("PlayerGui"))
-s.Name="TeleportUI"
-s.Enabled=false
-local function t(u,v)
-	local w=Instance.new("Sound")
-	w.Name=u
-	w.SoundId=v
-	w.Volume=0.6
-	w.Parent=s
-	return w
+
+local clickSound = createSound("ClickSound", "rbxassetid://7817336081")
+local teleportSound = createSound("TeleportSound", "rbxassetid://864352897")
+local toggleSound = createSound("ToggleSound", "rbxassetid://6512218121")
+local toggleOffSound = createSound("ToggleOffSound", "rbxassetid://75053701115990")
+
+local messageLabel = Instance.new("TextLabel", screenGui)
+messageLabel.Size = UDim2.new(1, 0, 0, 40)
+messageLabel.Position = UDim2.new(0, 0, 0, 0)
+messageLabel.BackgroundTransparency = 1
+messageLabel.TextColor3 = Color3.fromRGB(0, 255, 0)
+messageLabel.TextScaled = true
+messageLabel.Font = Enum.Font.FredokaOne
+messageLabel.Text = ""
+messageLabel.ZIndex = 2
+
+-- Emoji Buttons
+local function createEmojiButton(name, pos, emoji)
+	local btn = Instance.new("TextButton")
+	btn.Name = name
+	btn.Size = UDim2.new(0, 150, 0, 50)
+	btn.Position = pos
+	btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+	btn.TextScaled = true
+	btn.Font = Enum.Font.FredokaOne
+	btn.Text = emoji
+	Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 12)
+	local stroke = Instance.new("UIStroke", btn)
+	stroke.Thickness = 3
+	stroke.Color = Color3.fromRGB(255, 255, 255)
+	stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	return btn
 end
-local x,y,z,aa=t("ClickSound","rbxassetid://7817336081"),t("TeleportSound","rbxassetid://864352897"),t("ToggleSound","rbxassetid://6512218121"),t("ToggleOffSound","rbxassetid://75053701115990")
-local ab=Instance.new("TextLabel",s)
-ab.Size=UDim2.new(1,0,0,40)
-ab.Position=UDim2.new(0,0,0,0)
-ab.BackgroundTransparency=1
-ab.TextColor3=Color3.fromRGB(0,255,0)
-ab.TextScaled=true
-ab.Font=Enum.Font.FredokaOne
-ab.Text=""
-ab.ZIndex=2
-local function ac(ad,ae,af)
-	local ag=Instance.new("TextButton")
-	ag.Name=ad
-	ag.Size=UDim2.new(0,150,0,50)
-	ag.Position=ae
-	ag.BackgroundColor3=Color3.fromRGB(60,60,60)
-	ag.TextColor3=Color3.fromRGB(255,255,255)
-	ag.TextScaled=true
-	ag.Font=Enum.Font.FredokaOne
-	ag.Text=af
-	Instance.new("UICorner",ag).CornerRadius=UDim.new(0,12)
-	local ah=Instance.new("UIStroke",ag)
-	ah.Thickness=3
-	ah.Color=Color3.fromRGB(255,255,255)
-	ah.ApplyStrokeMode=Enum.ApplyStrokeMode.Border
-	return ag
+
+local buttonFrame = Instance.new("Frame", screenGui)
+buttonFrame.Size = UDim2.new(0, 160, 0, 180)
+buttonFrame.Position = UDim2.new(0, 30, 1, -220)
+buttonFrame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+buttonFrame.BackgroundTransparency = 0.4
+buttonFrame.Active = true
+buttonFrame.Draggable = true
+buttonFrame.Selectable = true
+Instance.new("UICorner", buttonFrame).CornerRadius = UDim.new(0, 12)
+Instance.new("UIStroke", buttonFrame).Thickness = 2
+
+local posBtn = createEmojiButton("PositionBtn", UDim2.new(0, 5, 0, 10), "📍 Save Position")
+posBtn.Parent = buttonFrame
+
+local tweenBtn = createEmojiButton("TweenBtn", UDim2.new(0, 5, 0, 65), "🌀 Tween")
+tweenBtn.Parent = buttonFrame
+
+local antiStunBtn = createEmojiButton("AntiStunBtn", UDim2.new(0, 5, 0, 120), "🛡️ Anti Stun: OFF")
+antiStunBtn.Parent = buttonFrame
+
+-- Saved position & ghost
+local savedPosition = nil
+local ghostTorso = nil
+
+local function createGhostTorso(position)
+	if ghostTorso then ghostTorso:Destroy() end
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+
+	local torsoClone = root:Clone()
+	torsoClone.Anchored = true
+	torsoClone.CanCollide = false
+	torsoClone.Transparency = 0.5
+	torsoClone.Material = Enum.Material.Neon
+	torsoClone.Color = Color3.new(1, 1, 1)
+	torsoClone.CFrame = CFrame.new(position)
+	torsoClone.Parent = workspace
+	ghostTorso = torsoClone
 end
-local ai=Instance.new("Frame",s)
-ai.Size=UDim2.new(0,160,0,180)
-ai.Position=UDim2.new(0,30,1,-220)
-ai.BackgroundColor3=Color3.fromRGB(40,40,40)
-ai.BackgroundTransparency=0.4
-ai.Active=true
-ai.Draggable=true
-ai.Selectable=true
-Instance.new("UICorner",ai).CornerRadius=UDim.new(0,12)
-Instance.new("UIStroke",ai).Thickness=2
-local aj=ac("PositionBtn",UDim2.new(0,5,0,10),"📍 Save Position")
-aj.Parent=ai
-local ak=ac("TweenBtn",UDim2.new(0,5,0,65),"🌀 Tween")
-ak.Parent=ai
-local al=ac("AntiStunBtn",UDim2.new(0,5,0,120),"🛡️ Anti Stun: OFF")
-al.Parent=ai
-local am=nil
-local an=nil
-local function ao(ap)
-	if am then am:Destroy() end
-	local aq=d.Character and d.Character:FindFirstChild("HumanoidRootPart")
-	if not aq then return end
-	local ar=aq:Clone()
-	ar.Anchored=true
-	ar.CanCollide=false
-	ar.Transparency=0.5
-	ar.Material=Enum.Material.Neon
-	ar.Color=Color3.new(1,1,1)
-	ar.CFrame=CFrame.new(ap)
-	ar.Parent=workspace
-	am=ar
-end
-local function as(at)
-	local au=d.Character and d.Character:FindFirstChild("HumanoidRootPart")
-	if not au then return end
-	local av=12
-	local aw=40
-	local ax=1
-	local ay=ax/aw
-	for az=0,aw do
-		local aA=math.rad((360/aw)*az)
-		local aB=Vector3.new(math.cos(aA)*av,0,math.sin(aA)*av)
-		local aC=at+aB
-		au.CFrame=CFrame.new(aC,at)
-		task.wait(ay)
+
+-- Circular Orbit
+local function orbitAround(centerPos)
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+
+	local radius = 12
+	local steps = 40
+	local duration = 1
+	local delayPerStep = duration / steps
+
+	for i = 0, steps do
+		local angle = math.rad((360 / steps) * i)
+		local offset = Vector3.new(math.cos(angle) * radius, 0, math.sin(angle) * radius)
+		local newPos = centerPos + offset
+		root.CFrame = CFrame.new(newPos, centerPos)
+		task.wait(delayPerStep)
 	end
 end
-local espAdornments={}
-local function aD(aE)
-	if espAdornments[aE] then
-		for _,aF in ipairs(espAdornments[aE]) do
-			aF:Destroy()
+
+-- ESP
+local espAdornments = {}
+
+local function removeESP(character)
+	if espAdornments[character] then
+		for _, adorn in ipairs(espAdornments[character]) do
+			adorn:Destroy()
 		end
-		espAdornments[aE]=nil
+		espAdornments[character] = nil
 	end
 end
-local function aG(aH)
-	aD(aH)
-	espAdornments[aH]={}
-	for _,aI in ipairs(aH:GetDescendants()) do
-		if aI:IsA("BasePart") then
-			local aJ=Instance.new("BoxHandleAdornment")
-			aJ.Adornee=aI
-			aJ.Size=aI.Size
-			aJ.Transparency=0.5
-			aJ.ZIndex=10
-			aJ.AlwaysOnTop=true
-			aJ.Color3=Color3.fromRGB(0,170,255)
-			aJ.Parent=aI
-			table.insert(espAdornments[aH],aJ)
+
+local function addESP(character)
+	removeESP(character)
+	espAdornments[character] = {}
+
+	for _, part in ipairs(character:GetDescendants()) do
+		if part:IsA("BasePart") then
+			local adorn = Instance.new("BoxHandleAdornment")
+			adorn.Adornee = part
+			adorn.Size = part.Size
+			adorn.Transparency = 0.5
+			adorn.ZIndex = 10
+			adorn.AlwaysOnTop = true
+			adorn.Color3 = Color3.fromRGB(0, 170, 255)
+			adorn.Parent = part
+			table.insert(espAdornments[character], adorn)
 		end
 	end
 end
-local function aK(aL)
-	aG(aL)
-	local aM=aL:FindFirstChildOfClass("Humanoid")
-	if aM then
-		aM.Died:Connect(function()
-			aD(aL)
+
+local function setupCharacterESP(character)
+	addESP(character)
+	local humanoid = character:FindFirstChildOfClass("Humanoid")
+	if humanoid then
+		humanoid.Died:Connect(function()
+			removeESP(character)
 		end)
 	end
 end
-for _,aN in ipairs(a:GetPlayers()) do
-	if aN~=d then
-		if aN.Character then
-			aK(aN.Character)
+
+for _, p in ipairs(Players:GetPlayers()) do
+	if p ~= player then
+		if p.Character then
+			setupCharacterESP(p.Character)
 		end
-		aN.CharacterAdded:Connect(aK)
+		p.CharacterAdded:Connect(setupCharacterESP)
 	end
 end
-a.PlayerAdded:Connect(function(aO)
-	if aO~=d then
-		aO.CharacterAdded:Connect(aK)
+
+Players.PlayerAdded:Connect(function(p)
+	if p ~= player then
+		p.CharacterAdded:Connect(setupCharacterESP)
 	end
 end)
-if d.Character then aK(d.Character) end
-d.CharacterAdded:Connect(function(aP)
-	character=aP
-	humanoidRootPart=aP:WaitForChild("HumanoidRootPart")
-	aK(aP)
+
+if player.Character then
+	setupCharacterESP(player.Character)
+end
+
+player.CharacterAdded:Connect(function(char)
+	character = char
+	humanoidRootPart = char:WaitForChild("HumanoidRootPart")
+	setupCharacterESP(char)
 end)
-aj.MouseButton1Click:Connect(function()
-	x:Play()
-	local aQ=d.Character or d.CharacterAdded:Wait()
-	local aR=aQ:FindFirstChild("HumanoidRootPart")
-	if not aR then return end
-	an=aR.Position
-	ao(an)
-	ab.Text="Saved Position"
-	task.delay(2,function() ab.Text="" end)
+
+-- Save Position
+posBtn.MouseButton1Click:Connect(function()
+	clickSound:Play()
+	local char = player.Character or player.CharacterAdded:Wait()
+	local root = char:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+	savedPosition = root.Position
+	createGhostTorso(savedPosition)
+	messageLabel.Text = "Saved Position"
+	task.delay(2, function() messageLabel.Text = "" end)
 end)
-ak.MouseButton1Click:Connect(function()
-	if not an then return end
-	local aS=d.Character and d.Character:FindFirstChild("HumanoidRootPart")
-	if not aS then return end
-	y:Play()
-	local aT=aS.Position
-	aS.CFrame=CFrame.new(aT+Vector3.new(0,500,0))
+
+-- + Orbit
+tweenBtn.MouseButton1Click:Connect(function()
+	if not savedPosition then return end
+	local root = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+	if not root then return end
+	teleportSound:Play()
+
+	local originalPosition = root.Position
+	root.CFrame = CFrame.new(originalPosition + Vector3.new(0, 500, 0))
 	task.wait(0.2)
-	aS.CFrame=CFrame.new(aT)
+	root.CFrame = CFrame.new(originalPosition)
 	task.wait(0.2)
-	local aU=an+Vector3.new(0,10,0)
-	local aV=b:Create(aS,TweenInfo.new(3.5,Enum.EasingStyle.Quad,Enum.EasingDirection.Out),{CFrame=CFrame.new(aU)})
-	aV:Play()
-	aV.Completed:Connect(function()
-		as(an)
+
+	local target = savedPosition + Vector3.new(0, 10, 0)
+	local tween = TweenService:Create(root, TweenInfo.new(3.5, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
+		CFrame = CFrame.new(target)
+	})
+	tween:Play()
+	tween.Completed:Connect(function()
+		orbitAround(savedPosition)
 	end)
 end)
-local amn=false
-local amO
-local function amP(aQ)
-	for _,aR in pairs(aQ:GetChildren()) do
-		if aR:IsA("BodyVelocity") or aR:IsA("BodyPosition") or aR:IsA("BodyGyro") or aR:IsA("BodyForce") then
-			aR:Destroy()
+
+-- Anti-Stun
+local antiStun = false
+local antiStunConnection
+
+local function removeBodyMoversFromPart(part)
+	for _, child in pairs(part:GetChildren()) do
+		if child:IsA("BodyVelocity") or child:IsA("BodyPosition") or child:IsA("BodyGyro") or child:IsA("BodyForce") then
+			child:Destroy()
 		end
 	end
 end
-local function amQ(aR)
-	amn=aR
-	al.Text="🛡️ Anti Stun: "..(aR and "ON" or "OFF")
-	if aR then
-		z:Play()
-		amO=c.Heartbeat:Connect(function()
-			local aS=d.Character
-			if aS then
-				for _,aT in pairs(aS:GetDescendants()) do
-					if aT:IsA("BasePart") and aT.Anchored then
-						aT.Anchored=false
-						amP(aT)
+
+local function setAntiStun(state)
+	antiStun = state
+	antiStunBtn.Text = "🛡️ Anti Stun: " .. (state and "ON" or "OFF")
+	if state then
+		toggleSound:Play()
+		antiStunConnection = RunService.Heartbeat:Connect(function()
+			local char = player.Character
+			if char then
+				for _, part in pairs(char:GetDescendants()) do
+					if part:IsA("BasePart") and part.Anchored then
+						part.Anchored = false
+						removeBodyMoversFromPart(part)
 					end
 				end
 			end
 		end)
 	else
-		aa:Play()
-		if amO then amO:Disconnect() amO=nil end
+		toggleOffSound:Play()
+		if antiStunConnection then
+			antiStunConnection:Disconnect()
+			antiStunConnection = nil
+		end
 	end
 end
-al.MouseButton1Click:Connect(function()
-	amQ(not amn)
-end)
-local function amR()
-	if m then
-		m:Destroy()
-		m=nil
-	end
-	s.Enabled=true
-end
-q.MouseButton1Click:Connect(function()
-	local aS=p.Text
-	local aT,aU=j(aS)
-	r.TextColor3=aT and Color3.fromRGB(0,255,0) or Color3.fromRGB(255,0,0)
-	r.Text=aU
-	if aT then
-		amR()
-	end
+
+antiStunBtn.MouseButton1Click:Connect(function()
+	setAntiStun(not antiStun)
 end)
